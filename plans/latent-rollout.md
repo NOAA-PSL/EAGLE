@@ -65,9 +65,13 @@ make training config=eagle.yaml ANEMOI_ENV=anemoi-dev   # no `make data`: reads 
       (job 23179679: 230 M params, 5.5 it/s).
 - [ ] aifs2-1deg-ic1 full pretraining, job 23180416 (8 nodes x 2 H100, 40 h limit; Bo's 2-IC run
       took 21h41m). Run dir `run/aifs2-1deg-ic1/training`. Bo's 2-IC config was smoke-tested only.
+- [ ] Compare `aifs2-1deg-ic1` (1 IC) against Bo's 2-IC pretraining checkpoint (no 2-IC rerun in
+      EAGLE, by decision): `/scratch4/BMC/gsienkf/Bo.Huang/expCodes/ML/aifs-single-mse-2.0-1deg/outputs/
+      pretraining/checkpoint/1166d230b93141a8bfe60d43841ba7b3/inference-anemoi-by_epoch-epoch_066-step_260000.ckpt`.
 - [ ] Fine-tuning stage (rollout to 12, 13 epochs; Bo's took 22h43m).
 - [ ] Inference + verification for aifs2 (ERA5 variable names differ from the GFS vx config).
-- [ ] Portability: env spec, site-specific settings, data transfer; push branches.
+- [ ] Portability: env spec, site-specific settings, data transfer.
+- [ ] Push: not a NOAA-EPIC member (can't push upstream); eagle-tools is read-only (access requested).
 
 ## Log
 
@@ -81,3 +85,5 @@ make training config=eagle.yaml ANEMOI_ENV=anemoi-dev   # no `make data`: reads 
   matches the standalone port. Smoke job 23179565 passed.
 - 2026-10-06: Single initial condition (`multistep_input: 1`, Bo used 2): smoke passed;
   submitted full pretraining `aifs2-1deg-ic1` as job 23180416.
+- 2026-10-06: Job 23180416 running at ~3.6 it/s (~20 h), effective LR 5e-4. Decided to compare
+  against Bo's 2-IC pretraining checkpoint rather than rerun 2-IC in EAGLE.
