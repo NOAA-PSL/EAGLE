@@ -1,0 +1,22 @@
+# 1-GPU, 50-step smoke test of the aifs2-1deg case. Compose last, e.g.
+#   make config compose=base:aifs2-1deg:ursa:anemoi-dev:aifs2-1deg-smoke
+
+# yamllint disable rule:line-length
+
+training:
+  anemoi:
+    dataloader:
+      limit_batches:
+        validation: 4
+        test: 2
+    training:
+      max_steps: 50
+      optimization:
+        lr_scheduler:
+          warmup_t: 10
+  execution:
+    batchargs:
+      nodes: 1
+      walltime: '00:30:00'
+val:
+  gpus_per_node: 1

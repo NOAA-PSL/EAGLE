@@ -1,0 +1,174 @@
+# AIFS v2 1-degree (O96) pretraining on ERA5, replicating Bo Huang's run
+# (/scratch4/BMC/gsienkf/Bo.Huang/expCodes/ML/aifs-single-mse-2.0-1deg, config.pretraining.full.yaml,
+# anemoi-training 0.6.3) on anemoi-training >= 0.17. Use in place of global.yaml, with the anemoi-dev
+# overlay, e.g.:
+#   make config compose=base:aifs2-1deg:ursa:anemoi-dev
+# Add :aifs2-1deg-smoke last for a 1-GPU, 50-step smoke test.
+#
+# The ERA5 zarrs already exist, so skip `make data`: training and inference read val.era5 in place.
+# Training builds the graph on the compute node; the o48 hidden grid is downloaded from
+# get.ecmwf.int into ~/.cache/anemoi/grids, so on a machine whose compute nodes have no internet,
+# fetch it once on a login node first:
+#   python -c "from anemoi.utils.grids import grids; grids('o48')"
+
+# yamllint disable rule:anchors rule:line-length
+
+app:
+  time:
+    multistep_input: 2 # input time steps (initial conditions), as in Bo's run
+inference:
+  anemoi:
+    input_dataset_kwargs: !dict '{{ val.era5.dataset }}'
+training:
+  anemoi:
+    defaults:
+      - data: zarr
+      - dataloader: native_grid
+      - diagnostics: evaluation
+      - system: slurm
+      - graph: encoder_decoder_only # identical to Bo's graph: o48 hidden nodes, CutOff 0.6 / KNN 3 edges
+      - model: transformer
+      - task: forecaster
+      - training: single
+      - _self_
+    # Blocks to customize the default Anemoi training config. Settings that match the defaults are
+    # left to the defaults; everything below matches Bo's config explicitly.
+    data:
+      frequency: 6h
+      datasets:
+        data:
+          diagnostic: [tp, cp, q_50, w_10, w_50, w_100, w_150, w_200, w_250, w_300, w_400, w_500, w_600, w_700, w_850, w_925, w_1000]
+          processors:
+            normalizer:
+              _target_: anemoi.models.preprocessing.normalizer.InputNormalizer
+              config:
+                default: mean-std
+                remap:
+                  cp: tp
+                std: [tp, cp, tcw, q_50, q_100, q_150, q_200, q_250, q_300, q_400, q_500, q_600, q_700, q_850, q_925, q_1000]
+                min-max: null
+                max: [sdor, slor, z]
+                none: [cos_latitude, cos_longitude, sin_latitude, sin_longitude, cos_julian_day, cos_local_time, sin_julian_day, sin_local_time, insolation, lsm]
+    dataloader:
+      batch_size:
+        training: 1
+        validation: 1
+        test: 4
+      limit_batches:
+        training: null
+        validation: 100
+        test: 20
+      dataset: !dict '{{ val.era5.dataset }}'
+      training:
+        datasets:
+          data:
+            start: 1979
+            end: 2021
+      validation:
+        datasets:
+          data:
+            start: 2022
+            end: 2022
+      test:
+        datasets:
+          data:
+            start: 2023
+            end: 2023
+    diagnostics:
+      log:
+        interval: 100
+        mlflow:
+          enabled: True
+          offline: True
+          authentication: False
+          tracking_uri: null
+          experiment_name: aifsv2-1deg-o96-10hpa
+          project_name: Anemoi
+          run_name: '{{ app.experiment_name }}'
+          system: False
+          terminal: True
+          on_resume_create_child: True
+          expand_hyperparams:
+            - config
+          http_max_retries: 35
+          max_params_length: 2000
+      plot:
+        callbacks: []
+    system:
+      hardware:
+        num_gpus_per_model: 1
+      input:
+        dataset: '{{ val.era5.dir }}/era5-o96-1979-2023-6h-v8.zarr' # must be a path; the real join is dataloader.dataset
+        graph: '{{ training.rundir }}/outputs/graph.pt'
+      output:
+        root: '{{ training.rundir }}/outputs/'
+    model:
+      num_channels: 1024
+      processor:
+        num_chunks: 2
+      bounding:
+        datasets:
+          data:
+            - _target_: anemoi.models.layers.bounding.ReluBounding
+              variables: [tp, tcw, q_50, q_100, q_150, q_200, q_250, q_300, q_400, q_500, q_600, q_700, q_850, q_925, q_1000]
+            - _target_: anemoi.models.layers.bounding.FractionBounding
+              variables: [cp]
+              min_val: 0
+              max_val: 1
+              total_var: tp
+    task:
+      multistep_input: !int '{{ app.time.multistep_input }}'
+      multistep_output: 1
+      timestep: '{{ app.time.freq }}'
+      rollout:
+        start: 1
+        epoch_increment: 0
+        maximum: 1
+      validation_rollout: 1
+    training:
+      max_steps: 260000
+      optimization:
+        lr: 3.125e-5 # local LR; scaled by the number of model replicas at runtime (5e-4 at 16 GPUs)
+        lr_scheduler:
+          warmup_t: 1000
+          lr_min: 3.0e-7
+      training_loss:
+        datasets:
+          data:
+            _target_: anemoi.training.losses.MSELoss
+            scalers: [pressure_level, general_variable, nan_mask_weights, node_weights, time_steps]
+            ignore_nans: False
+      validation_metrics:
+        datasets:
+          data:
+            mse:
+              _target_: anemoi.training.losses.MSELoss
+              scalers: []
+              ignore_nans: True
+      scalers:
+        datasets:
+          data:
+            general_variable:
+              weights:
+                10u: 0.5
+                10v: 0.5
+  execution:
+    batchargs:
+      # 8 nodes x 2 H100 = 16 data-parallel replicas x batch 1 = effective batch 16, as in Bo's run.
+      --cpus-per-task: 96 # the node's 192 cores split over its 2 GPU tasks
+      --gres: 'gpu:h100:{{ val.gpus_per_node }}'
+      exclusive: true
+      memory: '0' # --mem=0: all of each node's memory
+      nodes: 8
+      tasks_per_node: !int '{{ val.gpus_per_node }}'
+      walltime: '1-16:00:00'
+  remove: [] # keep the o48 hidden-node grid (base.yaml removes it for the GFS cases)
+val:
+  era5:
+    dataset:
+      join:
+        - '{{ val.era5.dir }}/era5-o96-1979-2023-6h-v8.zarr'
+        - '{{ val.era5.dir }}/era5-o96-10hpa-1979-2023-6h-v1.zarr'
+      drop: [q_10]
+    dir: /scratch4/BMC/gsienkf/Bo.Huang/expCodes/ML/aifs-single-mse-2.0-1deg/data/training
+  gpus_per_node: 2
