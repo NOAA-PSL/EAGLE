@@ -132,6 +132,7 @@ val:
     rundir: '{{ app.rundir }}/data'
   filenames:
     gfs_target_grid: global_one_degree.nc
+  gpus_per_node: 1 # GPUs per node used by training (exported as SLURM_GPUS_PER_NODE)
   inference:
     envcmds:
       - source {{ val.conda }}/etc/profile.d/conda.sh
@@ -147,7 +148,7 @@ val:
       - source {{ val.conda }}/etc/profile.d/conda.sh
       - conda activate anemoi
       - export MLFLOW_ALLOW_FILE_STORE=true
-      - export SLURM_GPUS_PER_NODE=1
+      - export SLURM_GPUS_PER_NODE={{ val.gpus_per_node }}
       - export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
       - set -ex
   variables:

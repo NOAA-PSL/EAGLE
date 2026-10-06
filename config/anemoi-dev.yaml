@@ -1,0 +1,30 @@
+# Run training and inference in the anemoi-dev environment, which has editable installs of the
+# NOAA-PSL anemoi-core and anemoi-inference feature/latent-rollout-plan forks. Compose last, e.g.
+# make config compose=base:global:ursa:anemoi-dev
+
+# yamllint disable rule:line-length
+
+inference:
+  execution:
+    batchargs:
+      account: gpu-ai4wp
+      queue: gpu
+training:
+  execution:
+    batchargs:
+      account: gpu-ai4wp
+      queue: gpu
+val:
+  inference:
+    envcmds:
+      - source {{ val.conda }}/etc/profile.d/conda.sh
+      - conda activate anemoi-dev
+      - set -ex
+  training:
+    envcmds:
+      - source {{ val.conda }}/etc/profile.d/conda.sh
+      - conda activate anemoi-dev
+      - export MLFLOW_ALLOW_FILE_STORE=true
+      - export SLURM_GPUS_PER_NODE={{ val.gpus_per_node }}
+      - export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+      - set -ex

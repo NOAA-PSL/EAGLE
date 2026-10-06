@@ -47,6 +47,7 @@ training:
       - graph: encoder_decoder_only
       - model: transformer
       - system: slurm
+      - task: forecaster
       - training: stretched
       - _self_
     # Blocks to customize default Anemoi training config.
@@ -172,9 +173,12 @@ training:
           interval: ${diagnostics.log.interval}
       plot:
         datasets_to_plot: ["data"]
-        asynchronous: false
+        settings:
+          asynchronous: false
+          precip_and_related_fields:
+            - accum_tp
         callbacks:
-          - _target_: anemoi.training.diagnostics.callbacks.plot.PlotLoss
+          - _target_: anemoi.training.diagnostics.callbacks.plot.LossCurvePlot
             dataset_names: ${diagnostics.plot.datasets_to_plot}
             every_n_batches: ${diagnostics.plot.frequency.batch}
             parameter_groups:
@@ -183,33 +187,34 @@ training:
               sfc_wind:
                 - u10
                 - v10
-          - _target_: anemoi.training.diagnostics.callbacks.plot.PlotSample
+          - _target_: anemoi.training.diagnostics.callbacks.plot.BatchOutputPlot
+            tag_infix: sample
             dataset_names: ${diagnostics.plot.datasets_to_plot}
-            output_steps: ${training.multistep_output}
-            accumulation_levels_plot:
-              - 0
-              - 0.05
-              - 0.1
-              - 0.25
-              - 0.5
-              - 1
-              - 1.5
-              - 2
-              - 3
-              - 4
-              - 5
-              - 6
-              - 7
-              - 100
-            colormaps: ${diagnostics.plot.colormaps}
             every_n_batches: ${diagnostics.plot.frequency.batch}
             parameters: ${diagnostics.plot.parameters}
-            per_sample: 6
-            precip_and_related_fields: ${diagnostics.plot.precip_and_related_fields}
             sample_idx: ${diagnostics.plot.sample_idx}
-          - _target_: anemoi.training.diagnostics.callbacks.plot.PlotHistogram
+            plot_fn:
+              _target_: anemoi.training.diagnostics.evaluation.plotting.batch_output.sample_plot_fn
+              _partial_: true
+              per_sample: 6
+              accumulation_levels_plot:
+                - 0
+                - 0.05
+                - 0.1
+                - 0.25
+                - 0.5
+                - 1
+                - 1.5
+                - 2
+                - 3
+                - 4
+                - 5
+                - 6
+                - 7
+                - 100
+          - _target_: anemoi.training.diagnostics.callbacks.plot.BatchOutputPlot
+            tag_infix: histo
             dataset_names: ${diagnostics.plot.datasets_to_plot}
-            output_steps: ${training.multistep_output}
             every_n_batches: ${diagnostics.plot.frequency.batch}
             parameters:
               - gh_500
@@ -217,8 +222,10 @@ training:
               - t2m
               - u10
               - v10
-            precip_and_related_fields: ${diagnostics.plot.precip_and_related_fields}
             sample_idx: ${diagnostics.plot.sample_idx}
+            plot_fn:
+              _target_: anemoi.training.diagnostics.evaluation.plotting.batch_output.histogram_plot_fn
+              _partial_: true
         frequency:
           batch: 50
           epoch: 1
@@ -232,8 +239,6 @@ training:
           - u10
           - v10
           - sp
-          - accum_tp
-        precip_and_related_fields:
           - accum_tp
     graph:
       overwrite: True
@@ -293,7 +298,8 @@ training:
             norm: unit-std
     system:
       input:
-        global_dataset: '{{ val.data.rundir }}/gfs.zarr'
+        dataset: '{{ val.data.rundir }}/gfs.zarr'
+        graph: '{{ training.rundir }}/outputs/graph.pt'
       hardware:
         num_gpus_per_model: 1
       output:
@@ -305,22 +311,26 @@ training:
           root: checkpoint
     model:
       bounding:
-        - _target_: anemoi.models.layers.bounding.ReluBounding
-          variables: !list '{{ training.anemoi.data.datasets.data.processors.normalizer.config.std }}'
+        datasets:
+          data:
+            - _target_: anemoi.models.layers.bounding.ReluBounding
+              variables: !list '{{ training.anemoi.data.datasets.data.processors.normalizer.config.std }}'
       num_channels: 512
       processor:
         window_size: 4320
-    training:
+    task:
       multistep_input: !int '{{ app.time.multistep_input }}'
-      optimizer:
-        _target_: torch.optim.AdamW
-        betas: [0.9, 0.95]
-        weight_decay: 0.01
-      lr:
-        iterations: ${training.max_steps}
-        min: 3.e-7
-        rate: 0.0000625
-        warmup: 2
+      timestep: '{{ app.time.freq }}'
+    training:
+      optimization:
+        lr: 0.0000625
+        lr_scheduler:
+          lr_min: 3.e-7
+          warmup_t: 2
+        optimizer:
+          _target_: torch.optim.AdamW
+          betas: [0.9, 0.95]
+          weight_decay: 0.01
       max_steps: 20
       metrics:
         datasets:
@@ -329,7 +339,6 @@ training:
             - t_850
             - u_850
             - v_850
-      model_task: anemoi.training.train.tasks.GraphForecaster
       scalers:
         datasets:
           data:

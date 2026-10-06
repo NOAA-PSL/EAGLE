@@ -6,6 +6,7 @@ STEPS    = data grids-and-meshes inference training vis-grid-global vis-grid-lam
 TOOLING  = config devenv env format lint realize shellcheck test typecheck unittest validate yamllint
 VERBOSE  = $(if $(filter undefined,$(origin DEBUG)),, --verbose)
 
+ANEMOI_ENV ?= anemoi
 INSTALLDIR ?= conda
 SHELL      := $(shell which bash)
 NOW        := $(shell date -u +"%Y-%m-%dT%H:%M:%S")
@@ -22,8 +23,8 @@ tasklist = @(set -x && uw execute$(VERBOSE) --module $(PACKAGE)/$(1)/$(2).py --c
 
 env4mod_$(PACKAGE)    = base
 env4mod_data          = data
-env4mod_inference     = anemoi
-env4mod_training      = anemoi
+env4mod_inference     = $(ANEMOI_ENV)
+env4mod_training      = $(ANEMOI_ENV)
 env4mod_visualization = visualization
 env4mod_wxvx          = wxvx
 
@@ -69,7 +70,7 @@ else
 endif
 
 inference:
-	$(call activate,anemoi)
+	$(call activate,$(ANEMOI_ENV))
 ifeq ($(task),?)
 	$(call tasklist,inference,inference,Inference)
 else
@@ -99,7 +100,7 @@ shellcheck:
 test: lint shellcheck typecheck yamllint unittest
 
 training:
-	$(call activate,anemoi)
+	$(call activate,$(ANEMOI_ENV))
 ifeq ($(task),?)
 	$(call tasklist,training,training,Training)
 else
