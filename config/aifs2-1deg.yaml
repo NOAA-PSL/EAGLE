@@ -15,7 +15,7 @@
 
 app:
   time:
-    multistep_input: 2 # input time steps (initial conditions), as in Bo's run
+    multistep_input: 1 # input time steps (initial conditions); Bo's run used 2
 inference:
   anemoi:
     input_dataset_kwargs: !dict '{{ val.era5.dataset }}'

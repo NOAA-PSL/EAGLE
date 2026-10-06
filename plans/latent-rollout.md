@@ -61,8 +61,10 @@ make training config=eagle.yaml ANEMOI_ENV=anemoi-dev   # no `make data`: reads 
       checkpoint provenance.
 - [x] aifs2-1deg in EAGLE, Bo's settings (`multistep_input: 2`): 1-GPU smoke test passed
       (job 23179565: 231 M params, 5.3 it/s, checkpoint 935.19 MB, graph built in-job).
-- [ ] aifs2-1deg full pretraining (8 nodes x 2 H100, ~22 h; Bo's took 21h41m).
-- [ ] Switch to a single initial condition (`app.time.multistep_input: 1`), smoke, then full run.
+- [x] Switch to a single initial condition (`app.time.multistep_input: 1`): smoke passed
+      (job 23179679: 230 M params, 5.5 it/s).
+- [ ] aifs2-1deg-ic1 full pretraining, job 23180416 (8 nodes x 2 H100, 40 h limit; Bo's 2-IC run
+      took 21h41m). Run dir `run/aifs2-1deg-ic1/training`. Bo's 2-IC config was smoke-tested only.
 - [ ] Fine-tuning stage (rollout to 12, 13 epochs; Bo's took 22h43m).
 - [ ] Inference + verification for aifs2 (ERA5 variable names differ from the GFS vx config).
 - [ ] Portability: env spec, site-specific settings, data transfer; push branches.
@@ -77,3 +79,5 @@ make training config=eagle.yaml ANEMOI_ENV=anemoi-dev   # no `make data`: reads 
   1-GPU smoke passed (job 23175516). User then asked to redo it inside EAGLE.
 - 2026-10-06: Added `config/aifs2-1deg.yaml` + `aifs2-1deg-smoke.yaml`; resolved training config
   matches the standalone port. Smoke job 23179565 passed.
+- 2026-10-06: Single initial condition (`multistep_input: 1`, Bo used 2): smoke passed;
+  submitted full pretraining `aifs2-1deg-ic1` as job 23180416.
