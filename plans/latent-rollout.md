@@ -116,8 +116,10 @@ task (`task: autoencoder`), useful for stage 1-style encoder/decoder work.
       (job 23179565: 231 M params, 5.3 it/s, checkpoint 935.19 MB, graph built in-job).
 - [x] Switch to a single initial condition (`app.time.multistep_input: 1`): smoke passed
       (job 23179679: 230 M params, 5.5 it/s).
-- [ ] aifs2-1deg-ic1 full pretraining, job 23180416 (8 nodes x 2 H100, 40 h limit; Bo's 2-IC run
-      took 21h41m). Run dir `run/aifs2-1deg-ic1/training`. Bo's 2-IC config was smoke-tested only.
+- [x] aifs2-1deg-ic1 full pretraining, job 23180416: completed in 21h46m (260k steps, 66 epochs).
+      Checkpoint `run/aifs2-1deg-ic1/training/outputs/checkpoint/8a8641f4213949afb3c68365ea7d1e63/`.
+      vs Bo's 2-IC at epoch 66 (6 h val MSE ratio ours/Bo): loss 1.04, z500 1.09, msl 1.07, t850 1.03,
+      winds/2t 1.01-1.02, tp 1.14 (tp val error rises after ~epoch 40 in both runs).
 - [ ] Compare `aifs2-1deg-ic1` (1 IC) against Bo's 2-IC pretraining checkpoint (no 2-IC rerun in
       EAGLE, by decision): `/scratch4/BMC/gsienkf/Bo.Huang/expCodes/ML/aifs-single-mse-2.0-1deg/outputs/
       pretraining/checkpoint/1166d230b93141a8bfe60d43841ba7b3/inference-anemoi-by_epoch-epoch_066-step_260000.ckpt`.
@@ -142,3 +144,5 @@ task (`task: autoencoder`), useful for stage 1-style encoder/decoder work.
   against Bo's 2-IC pretraining checkpoint rather than rerun 2-IC in EAGLE.
 - 2026-10-06: Added latent-rollout training plan (WeatherMesh-3 and GraphDOP lessons, curriculum,
   reusable upstream DOP branches).
+- 2026-10-07: 1-IC pretraining finished; val curves vs Bo in `../figures/aifs2-compare/`
+  (1 IC ~3-9% worse on mass fields, 14% on tp; winds/temps within noise).
