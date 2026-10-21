@@ -1,0 +1,14 @@
+# One MI300X instead of the whole node, for smoke tests on the 2-day smoke zarrs (too few samples for 8
+# replicas). Compose after mi300x, e.g.
+#   make config compose=base:aifs2-1deg:aifs37:aifs37-a0:ursa:anemoi-dev:aifs2-1deg-smoke:aifs37-smoke:mi300x:mi300x-1gpu
+
+training:
+  anemoi:
+    training:
+      accum_grad_batches: 1
+  execution:
+    batchargs:
+      memory: 240G
+      walltime: '00:30:00'
+val:
+  gpus_per_node: 1

@@ -1,0 +1,24 @@
+# Multi-GPU DDP check on MI300X (ROCM.md open item 1): Bo's aifs2-1deg case on one node x 8 GPUs (gpuwf limit),
+# with gradient accumulation 2, 100 steps. Needs no new data. Compose after mi300x, e.g.
+#   make config compose=base:aifs2-1deg:ursa:anemoi-dev:mi300x:mi300x-ddp-smoke
+
+app:
+  experiment_name: mi300x-ddp-smoke
+training:
+  anemoi:
+    dataloader:
+      limit_batches:
+        validation: 4
+        test: 2
+    diagnostics:
+      log:
+        mlflow:
+          enabled: False
+    training:
+      max_steps: 100
+      optimization:
+        lr_scheduler:
+          warmup_t: 10
+  execution:
+    batchargs:
+      walltime: '00:45:00'

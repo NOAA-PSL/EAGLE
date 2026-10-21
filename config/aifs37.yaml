@@ -1,0 +1,60 @@
+# AIFS 37-level recipe, round 1 (A0/A1/A2; HANDOFF.md): the settings shared by all three runs, on top of
+# aifs2-1deg. Compose with one level set (aifs37-a0/a1/a2), e.g.
+#   make config compose=base:aifs2-1deg:aifs37:aifs37-a1:ursa:anemoi-dev
+# and add :mi300x last for the MI300X runs, or :aifs2-1deg-smoke last for a 1-GPU, 50-step smoke test.
+#
+# Needs anemoi-core feature/aifs37-recipe (7da515036: GlobalDryMassFixer, stdev_min,
+# ThicknessVariableLevelScaler; 757852276: flex attention).
+#
+# Resuming: the runscript passes training.run_id=<id> when outputs/checkpoint/<id>/last.ckpt exists, so
+# the same runscript can be resubmitted (e.g. chained with --dependency=afterany) past the 2-day gpuwf limit.
+
+# yamllint disable rule:line-length
+
+app:
+  time:
+    multistep_input: 2 # two time levels, as Bo's run (one did not work; don't change)
+training:
+  anemoi:
+    data:
+      datasets:
+        data:
+          # emissivity precursors: sd, siconc, swvl1, stl1 prognostic; vegetation, soil type, roughness forcings
+          forcing: [cos_latitude, cos_longitude, sin_latitude, sin_longitude, cos_julian_day, cos_local_time, sin_julian_day, sin_local_time, insolation, lsm, sdor, slor, z, cvh, cvl, lai_hv, lai_lv, slt, fsr]
+          processors:
+            normalizer:
+              config:
+                # std (no offset) for the ReluBounded fields (in aifs37-a*), none for the [0, 1] fields, so
+                # their bounds sit at the physical 0 and 1
+                max: [sdor, slor, z, slt]
+                none: [cos_latitude, cos_longitude, sin_latitude, sin_longitude, cos_julian_day, cos_local_time, sin_julian_day, sin_local_time, insolation, lsm, siconc, cvh, cvl]
+                stdev_min:
+                  q_*: 1.0e-5
+    diagnostics:
+      log:
+        mlflow:
+          experiment_name: aifs37
+          max_params_length: 4000 # 37 levels: ~2040 flattened config params, over the default 2000
+    training:
+      # Bo's 16-mixed gave a NaN loss on ~3% of steps (skipped by the grad scaler, 2026-10-20); bf16 has fp32 range
+      precision: bf16-mixed
+      scalers:
+        datasets:
+          data:
+            pressure_level:
+              _target_: anemoi.training.losses.scalers.ThicknessVariableLevelScaler
+              group: pl
+              floor: 0.1 # x the mean layer thickness
+              total: 6.5 # = Bo's ReluVariableLevelScaler sum on 14 levels; no height decay
+  execution:
+    executable: '{{ app.launcher | default("") }} anemoi-training train --config-name=training $(d=$(ls -td outputs/checkpoint/*/ 2>/dev/null | head -1); [ -f "${d}last.ckpt" ] && echo training.run_id=$(basename $d))'
+    batchargs:
+      queue: gpu # H100 QoS gpu (7-day limit, up to 20 GPUs); mi300x.yaml switches to gpuwf
+      walltime: '2-00:00:00'
+val:
+  era5:
+    dir37: /scratch4/BMC/gsienkf/Sergey.Frolov/era5_o96_37lev/chunks
+    zarr37: era5-o96-37lev-1979-01-01T00-2023-12-31T18-s4.zarr # radianced zarr/era5_o96_37lev recipes
+    zarrstl1: era5-o96-stl1-1979-01-01T00-2023-12-31T18.zarr
+    start: 1979-01-01T00:00:00
+    end: 2023-12-31T18:00:00

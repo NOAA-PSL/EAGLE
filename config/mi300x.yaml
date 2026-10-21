@@ -1,0 +1,38 @@
+# Train on AMD MI300X (u1-mi300x, 8 GPUs per node) in the anemoi-rocm env (ROCM.md). Compose last
+# (after anemoi-dev), e.g.
+#   make config compose=base:aifs2-1deg:aifs37:aifs37-a0:ursa:anemoi-dev:mi300x
+# u1-mi300x allows only QoS gpuwf: at most 8 MI300X (one node) per job, 12 h links at 8 GPUs (walltime below). No flash attention on
+# ROCm: flex attention instead.
+
+# yamllint disable rule:line-length
+
+training:
+  anemoi:
+    model:
+      processor:
+        attention_implementation: flex_attention
+    training:
+      # 8 replicas x batch 1 x 2 accumulated = effective batch 16, as Bo's 16 GPUs; max_steps counts optimizer steps
+      accum_grad_batches: 2
+      optimization:
+        lr: 6.25e-5 # local LR; x 8 replicas = 5e-4, as Bo's run
+  execution:
+    batchargs:
+      --cpus-per-task: 12 # the node's 96 cores split over its 8 GPU tasks
+      --gres: 'gpu:mi300x:{{ val.gpus_per_node }}'
+      nodes: 1
+      partition: u1-mi300x
+      queue: gpuwf
+      # gpuwf caps running MI300X time per account at 11520 GPU-min (8 GPUs x 1 day), shared with the
+      # account's other MI300X jobs; 12 h links (half the cap) leave room for them; chain resume jobs
+      walltime: '12:00:00'
+val:
+  gpus_per_node: 8
+  training:
+    envcmds:
+      - source {{ val.conda }}/etc/profile.d/conda.sh
+      - conda activate anemoi-rocm
+      - export MLFLOW_ALLOW_FILE_STORE=true
+      - export SLURM_GPUS_PER_NODE={{ val.gpus_per_node }}
+      - export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+      - set -ex

@@ -1,0 +1,33 @@
+# Smoke test 0a of the AIFS 37-level recipe: 1 GPU, 50 steps, on the 2-day test zarrs (2022-07-01..02),
+# so it can run before the full builds finish. Compose last, after aifs2-1deg-smoke, e.g.
+#   make config compose=base:aifs2-1deg:aifs37:aifs37-a1:ursa:anemoi-dev:aifs2-1deg-smoke:aifs37-smoke
+# The test zarrs' statistics cover only those two days: this checks the plumbing, not the loss.
+
+# yamllint disable rule:line-length
+
+app:
+  experiment_name: aifs37-smoke
+training:
+  anemoi:
+    dataloader:
+      training:
+        datasets:
+          data:
+            start: 2022-07-01
+            end: 2022-07-02
+      validation:
+        datasets:
+          data:
+            start: 2022-07-01
+            end: 2022-07-02
+      test:
+        datasets:
+          data:
+            start: 2022-07-01
+            end: 2022-07-02
+val:
+  era5:
+    zarr37: era5-o96-37lev-2022-07-01T00-2022-07-02T18-s4.zarr
+    zarrstl1: era5-o96-stl1-2022-07-01T00-2022-07-02T18.zarr
+    start: 2022-07-01T00:00:00
+    end: 2022-07-02T18:00:00

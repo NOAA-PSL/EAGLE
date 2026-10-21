@@ -1,0 +1,8 @@
+# Bill GPU training to account gsienkf (it has QoS gpuwf) instead of gpu-ai4wp. gpuwf's MI300X run-time cap
+# (8 GPUs x 1 day) is per account, so a second MI300X run on gsienkf can run alongside one on gpu-ai4wp.
+# Compose last, e.g. make config compose=base:aifs2-1deg:aifs37:aifs37-a2:ursa:anemoi-dev:mi300x:gsienkf-gpu
+
+training:
+  execution:
+    batchargs:
+      account: gsienkf
